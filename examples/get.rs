@@ -1,4 +1,5 @@
 #[tokio::main]
 async fn main() {
-    println!("{:?}", wataxrate::get("", "", "").await);
+    // Space Needle's Address
+    println!("{:#?}", wataxrate::get("400 Broad St", "Seattle", "98109").await);
 }

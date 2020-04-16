@@ -1,10 +1,22 @@
-const DOR_ADDR_PREFIX: &'static str = "https://webgis.dor.wa.gov/webapi/AddressRates.aspx?output=text";
-const DOR_RESPONSE_TEXT_REGEX: &'static str = r"LocationCode=(?P<loc>\d*)\sRate=(?P<rate>\.\d+)\sResultCode=(?P<code>\d+)";
+//! This library can be used to get tax rates for addresses in WA state! Meant to be super simple.
+//! 
+//! It gets data from DOR using its [XML URL interface defined here](https://dor.wa.gov/find-taxes-rates/retail-sales-tax/destination-based-sales-tax-and-streamlined-sales-tax/wa-sales-tax-rate-lookup-url-interface).
+//! 
+//! Note that this needs [`tokio`](https://crates.io/crates/tokio), as [`reqwest`](https://crates.io/crates/reqwest) needs `tokio`!
+
+#[macro_use]
+extern crate log;
 
 use reqwest::Error as ReqwestError;
 use std::convert::TryFrom;
+use strong_xml::{XmlRead, XmlWrite};
 
-#[derive(Debug, PartialEq)]
+
+
+const DOR_ADDR_PREFIX: &'static str = "https://webgis.dor.wa.gov/webapi/AddressRates.aspx?output=xml";
+
+/// These codes are taken from [the DOR spec](https://dor.wa.gov/find-taxes-rates/retail-sales-tax/destination-based-sales-tax-and-streamlined-sales-tax/wa-sales-tax-rate-lookup-url-interface);
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Code {
     AddrFound,
     AddrNotFoundZipFound,
@@ -18,6 +30,7 @@ pub enum Code {
 }
 
 impl Code {
+    /// True when the returned values are garbage, as in the tax rate could be -1 or something
     pub fn is_error(&self) -> bool {
         use Code::*;
         match self {
@@ -29,6 +42,16 @@ impl Code {
     }
     pub fn retryable(&self) -> bool {
         &Code::InternalError == self
+    }
+}
+
+use std::str::FromStr;
+
+impl FromStr for Code {
+    type Err = &'static str;
+    fn from_str(s: &std::primitive::str) -> Result<Self, Self::Err> {
+        let num: u8 = s.parse().map_err(|_| "did not use integer as code")?;
+        Self::try_from(num)
     }
 }
 
@@ -52,10 +75,13 @@ impl TryFrom<u8> for Code {
     }
 }
 
+/// Error retreiving tax info. DOR errors most likely mean bad input, as in a weird address
 #[derive(Debug)]
 pub enum TaxInfoError {
     Http(ReqwestError),
-    Dor(Code),
+    /// DOR gave a code that means there as an error. We return the raw TaxInfo object in case
+    /// you'd like to inspect it
+    Dor((Code, TaxInfo)),
     Internal(&'static str),
     NoMoreRetries,
 }
@@ -64,7 +90,7 @@ impl TaxInfoError {
     pub fn retryable(&self) -> bool {
         match self {
             TaxInfoError::NoMoreRetries => false,
-            TaxInfoError::Dor(code) => code.retryable(),
+            TaxInfoError::Dor((code,  _)) => code.retryable(),
             TaxInfoError::Http(re) => re.status().map(|s| {
                 s.is_server_error()
             }).unwrap_or(true),
@@ -79,11 +105,69 @@ impl From<ReqwestError> for TaxInfoError {
     }
 }
 
-#[derive(Debug)]
+
+/// The Address parsed by DOR, returned as part of TaxInfo
+#[derive(XmlWrite, XmlRead, PartialEq, Debug)]
+#[xml(tag = "addressline")]
+pub struct Address {
+    #[xml(attr = "househigh")]
+    pub househigh: Option<u32>,
+    #[xml(attr = "houselow")]
+    pub houselow: Option<u32>,
+    #[xml(attr = "evenodd")]
+    pub evenodd: Option<String>,
+    #[xml(attr = "street")]
+    pub street: Option<String>,
+    #[xml(attr = "zip")]
+    pub zip: Option<u32>,
+    #[xml(attr = "plus4")]
+    pub plus4: Option<u32>,
+    #[xml(attr = "period")]
+    pub period: Option<String>,
+    #[xml(attr = "rta")]
+    pub rta: Option<String>,
+    #[xml(attr = "ptba")]
+    pub ptba: Option<String>,
+    #[xml(attr = "cez")]
+    pub cez: Option<String>,
+}
+
+/// Tax Rate information, returned as part of TaxInfo
+#[derive(XmlWrite, XmlRead, PartialEq, Debug)]
+#[xml(tag = "rate")]
+pub struct TaxRate {
+    #[xml(attr = "name")]
+    pub name: String,
+    #[xml(attr = "code")]
+    pub code: String,
+    #[xml(attr = "localrate")]
+    pub localrate: f32,
+    #[xml(attr = "staterate")]
+    pub staterate: f32,
+}
+
+
+/// Tax Info provided by WA State DOR
+/// 
+/// See [the DOR website](https://dor.wa.gov/find-taxes-rates/retail-sales-tax/destination-based-sales-tax-and-streamlined-sales-tax/wa-sales-tax-rate-lookup-url-interface) for specifics.
+#[derive(XmlRead, PartialEq, Debug)]
+#[xml(tag = "response")]
 pub struct TaxInfo {
-    location_code: u32,
-    rate: f32,
-    code: Code
+    #[xml(attr = "loccode")]
+    pub loccode: i32,
+    #[xml(attr = "rate")]
+    pub rate: f32,
+    #[xml(attr = "code")]
+    pub code: Code,
+    #[xml(attr = "localrate")]
+    pub localrate: f32,
+    #[xml(attr = "debughint")]
+    pub debughint: Option<String>,
+    // Children
+    #[xml(child = "addressline")]
+    pub address: Option<Address>,
+    #[xml(child = "rate")]
+    pub taxrate: Option<TaxRate>,
 }
 
 const MAX_ATTEMPTS: usize = 3;
@@ -109,39 +193,25 @@ pub async fn get(addr: &str, city: &str, zip: &str) -> Result<TaxInfo, TaxInfoEr
 
 /// No retries, just one attempt, no timeout, nothing
 pub async fn get_basic(addr: &str, city: &str, zip: &str) -> Result<TaxInfo, TaxInfoError> {
-    let raw_string = reqwest::get(&format!("{}&addr={}&city={}&zip={}",
+    let request = format!("{}&addr={}&city={}&zip={}",
             DOR_ADDR_PREFIX,
             addr,
             city,
-            zip)).await?.text().await?;
+            zip);
 
-    println!("raw string {}", raw_string);
+    debug!("URL to GET from dor {}", request);
+    let raw_string = reqwest::get(&request).await?.text().await?;
 
-    let regex = regex::Regex::new(DOR_RESPONSE_TEXT_REGEX).unwrap();
-    if let Some(c) = regex.captures(&raw_string) {
-        let loc = c.name("loc").ok_or_else(|| TaxInfoError::Internal("Expected location field not found in DOR response"))?.as_str();
-        let rate = c.name("rate").ok_or_else(|| TaxInfoError::Internal("Expected rate field not found in DOR response"))?.as_str();
-        let code = c.name("code").ok_or_else(|| TaxInfoError::Internal("Expected code field not found in DOR response"))?.as_str();
+    debug!("raw string from DOR {}", raw_string);
 
-        println!("loc {} rate {} code {}", loc, rate, code);
-        
-
-        let code: u8 = code.parse().map_err(|_| TaxInfoError::Internal("Could not parse number from result code"))?;
-        let code: Code = Code::try_from(code).map_err(|_| TaxInfoError::Internal("Could not parse a valid Code from provided code"))?;
-        
-        if code.is_error() {
-            return Err(TaxInfoError::Dor(code));
+    match TaxInfo::from_str(&raw_string) {
+        Ok(rti) => {
+            if rti.code.is_error() {
+                Err(TaxInfoError::Dor((rti.code, rti)))
+            } else {
+                Ok(rti)
+            }
         }
-
-        let location_code: u32 = loc.parse().map_err(|_| TaxInfoError::Internal("Could not parse number from location code"))?;
-        let rate: f32 = rate.parse().map_err(|_| TaxInfoError::Internal("Could not parse number from rate"))?;
-
-        Ok(TaxInfo {
-            code: code,
-            rate: rate,
-            location_code: location_code,
-        })
-    } else {
-        Err(TaxInfoError::Internal("Response did not match expected regex"))
+        Err(_e) => Err(TaxInfoError::Internal("Error parsing response from DOR")),
     }
 }

@@ -1,15 +1,18 @@
 [package]
 name = "wataxrate"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Ryan Gorup <gorup@users.noreply.github.com>"]
 edition = "2018"
+description = "Tool for getting tax information for addresses in WA State."
+license = "University of Illinois - NCSA Open Source License (NCSA)"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 reqwest = { version = "0.10", features = ["rustls"] }
 tokio = { version = "0.2", features = ["time"] }
-regex = "1"
+strong-xml = "0.4.1"
+log = "0.4"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["rt-threaded", "macros"] }
