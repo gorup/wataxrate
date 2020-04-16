@@ -1,0 +1,15 @@
+[package]
+name = "wataxrate"
+version = "0.1.0"
+authors = ["Ryan Gorup <gorup@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+reqwest = { version = "0.10", features = ["rustls"] }
+tokio = { version = "0.2", features = ["time"] }
+regex = "1"
+
+[dev-dependencies]
+tokio = { version = "0.2", features = ["rt-threaded", "macros"] }
