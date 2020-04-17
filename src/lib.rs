@@ -171,7 +171,7 @@ pub struct TaxInfo {
 }
 
 const MAX_ATTEMPTS: usize = 3;
-const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(2_500);
+const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(7_000);
 
 /// Has retries, reasonable timeouts, defaults, fully ready to go.
 pub async fn get(addr: &str, city: &str, zip: &str) -> Result<TaxInfo, TaxInfoError> {

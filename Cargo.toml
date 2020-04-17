@@ -1,6 +1,6 @@
 [package]
 name = "wataxrate"
-version = "1.0.2"
+version = "1.0.3"
 authors = ["Ryan Gorup <gorup@users.noreply.github.com>"]
 edition = "2018"
 description = "Tool for getting tax information for addresses in WA State."
