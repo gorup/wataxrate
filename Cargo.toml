@@ -5,7 +5,7 @@ authors = ["Ryan Gorup <gorup@users.noreply.github.com>"]
 edition = "2018"
 description = "Tool for getting tax information for addresses in WA State."
 license = "NCSA"
-repository = "https://github.com/rust-lang/cargo/"
+repository = "https://github.com/gorup/wataxrate"
 keywords = ["tax", "taxes", "washington", "wa"]
 readme = "README.md"
 
