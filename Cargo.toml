@@ -1,11 +1,11 @@
 [package]
 name = "wataxrate"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Ryan Gorup <gorup@users.noreply.github.com>"]
 edition = "2018"
 description = "Tool for getting tax information for addresses in WA State."
 license = "NCSA"
-repository = "https://github.com/rust-lang/cargo/"
+repository = "https://github.com/gorup/wataxrate"
 keywords = ["tax", "taxes", "washington", "wa"]
 readme = "README.md"
 
@@ -17,6 +17,8 @@ reqwest = { version = "0.10", features = ["rustls"] }
 tokio = { version = "0.2", features = ["time"] }
 strong-xml = "0.4.1"
 log = "0.4"
+url = "2.1.1"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["rt-threaded", "macros"] }
+env_logger = "0.7"

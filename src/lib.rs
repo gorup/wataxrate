@@ -10,7 +10,7 @@ extern crate log;
 use reqwest::Error as ReqwestError;
 use std::convert::TryFrom;
 use strong_xml::{XmlRead, XmlWrite};
-
+use url::form_urlencoded;
 
 
 const DOR_ADDR_PREFIX: &'static str = "https://webgis.dor.wa.gov/webapi/AddressRates.aspx?output=xml";
@@ -193,11 +193,11 @@ pub async fn get(addr: &str, city: &str, zip: &str) -> Result<TaxInfo, TaxInfoEr
 
 /// No retries, just one attempt, no timeout, nothing
 pub async fn get_basic(addr: &str, city: &str, zip: &str) -> Result<TaxInfo, TaxInfoError> {
-    let request = format!("{}&addr={}&city={}&zip={}",
-            DOR_ADDR_PREFIX,
-            addr,
-            city,
-            zip);
+    let request: String = form_urlencoded::Serializer::new(DOR_ADDR_PREFIX.to_string())
+        .append_pair("addr", addr)
+        .append_pair("city", city)
+        .append_pair("zip", zip)
+        .finish();
 
     debug!("URL to GET from dor {}", request);
     let raw_string = reqwest::get(&request).await?.text().await?;
