@@ -1,8 +1,8 @@
 [package]
 name = "wataxrate"
-version = "1.0.3"
+version = "1.0.4"
 authors = ["Ryan Gorup <gorup@users.noreply.github.com>"]
-edition = "2018"
+edition = "2024"
 description = "Tool for getting tax information for addresses in WA State."
 license = "NCSA"
 repository = "https://github.com/gorup/wataxrate"
@@ -10,15 +10,15 @@ keywords = ["tax", "taxes", "washington", "wa"]
 readme = "README.md"
 
 [badges]
-maintenance = { status = "passively-maintained" }
+maintenance = { status = "as-is" }
 
 [dependencies]
-reqwest = { version = "0.10", features = ["rustls"] }
-tokio = { version = "0.2", features = ["time"] }
-strong-xml = "0.4.1"
+reqwest = { version = "0.12", features = ["rustls-tls"] }
+tokio = { version = "1.43", features = ["full"] }
+strong-xml = "0.6.3"
 log = "0.4"
-url = "2.1.1"
+url = "2.5.4"
 
 [dev-dependencies]
-tokio = { version = "0.2", features = ["rt-threaded", "macros"] }
-env_logger = "0.7"
+tokio = { version = "1.43", features = ["macros"] }
+env_logger = "0.11"
